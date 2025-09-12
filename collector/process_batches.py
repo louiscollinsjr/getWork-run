@@ -94,29 +94,33 @@ def update_job_embeddings(job_id: int, embedding_data: Dict) -> bool:
     """Update job row with embedding data"""
     try:
         # Extract embeddings from the result
-        # The format will depend on OpenAI's response structure
-        embeddings = embedding_data.get("data", [])
+        response_body = embedding_data.get("response", {}).get("body", {})
+        embeddings = response_body.get("data", [])
         
-        # For simplicity, let's assume we get one embedding
-        if embeddings:
-            embedding_vector = embeddings[0].get("embedding", [])
+        # We expect 4 embeddings: core_requirements, transferable_context, role_context, full_description
+        if len(embeddings) >= 3:
+            core_embedding = embeddings[0].get("embedding", [])
+            transferable_embedding = embeddings[1].get("embedding", [])
+            role_embedding = embeddings[2].get("embedding", [])
             
-            # Update the job in Supabase
+            # Update the job in Supabase with all three embeddings
             update_data = {
-                "embeddings": embedding_vector,
+                "core_requirements_embedding": core_embedding,
+                "transferable_context_embedding": transferable_embedding,
+                "role_context_embedding": role_embedding,
                 "processed_at": datetime.now().isoformat()
             }
             
             response = supabase.table("jobs").update(update_data).eq("id", job_id).execute()
             
             if response.data:
-                logger.info(f"Successfully updated embedding for job {job_id}")
+                logger.info(f"Successfully updated embeddings for job {job_id}")
                 return True
             else:
-                logger.error(f"Failed to update embedding for job {job_id}: No data returned")
+                logger.error(f"Failed to update embeddings for job {job_id}: No data returned")
                 return False
         else:
-            logger.warning(f"No embeddings found for job {job_id}")
+            logger.warning(f"Insufficient embeddings found for job {job_id}: got {len(embeddings)}, expected 3+")
             return False
             
     except Exception as e:

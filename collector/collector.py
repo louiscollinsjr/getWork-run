@@ -17,7 +17,7 @@ load_dotenv()
 
 # Initialize Supabase client
 supabase_url = os.getenv("SUPABASE_URL")
-supabase_key = os.getenv("SUPABASE_KEY") or os.getenv("SUPABASE_API_KEY") or os.getenv("SUPABASE_ANON_KEY")
+supabase_key = os.getenv("SUPABASE_SERVICE_KEY") or os.getenv("SUPABASE_KEY") or os.getenv("SUPABASE_API_KEY") or os.getenv("SUPABASE_ANON_KEY")
 supabase: Client = create_client(supabase_url, supabase_key)
 
 # We'll use the Job class from jobspy directly
@@ -47,7 +47,7 @@ def job_to_dict(job) -> dict:
         "location": clean_value(getattr(job, 'location', None)),
         "salary": clean_value(getattr(job, 'salary', None)),
         "description": clean_value(getattr(job, 'description', None)),
-        "url": clean_value(getattr(job, 'job_url', None)) or clean_value(getattr(job, 'url', None)),
+        "job_url": clean_value(getattr(job, 'job_url', None)) or clean_value(getattr(job, 'url', None)),
         "date_posted": date_posted_str,
         "job_type": clean_value(getattr(job, 'job_type', None)),
         "remote": bool(getattr(job, 'remote', False)) if getattr(job, 'remote', None) is not None else False

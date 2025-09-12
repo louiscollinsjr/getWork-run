@@ -86,16 +86,24 @@ fastify.post('/api/search', async (request, reply) => {
     // Perform vector search
     const results = await vectorSearch(embedding, filters);
     
-    // Format response
-    const formattedResults = results.map(job => ({
-      job_id: job.id,
-      title: job.title,
-      company: job.company,
-      similarity: job.similarity,
-      match_reasoning: `Matches ${query} based on core requirements`
-    }));
-
-    return { results: formattedResults };
+    // Return results
+    return {
+      results: results.map(job => ({
+        id: job.id,
+        title: job.title,
+        company: job.company,
+        location: job.location,
+        job_url: job.job_url || '',
+        core_skills: job.core_skills,
+        nice_to_have_skills: job.nice_to_have_skills,
+        realistic_experience_level: job.realistic_experience_level,
+        transferable_skills_indicators: job.transferable_skills_indicators,
+        actual_job_complexity: job.actual_job_complexity,
+        bias_removal_notes: job.bias_removal_notes,
+        processed_at: job.processed_at,
+        similarity: job.similarity
+      }))
+    };
     
   } catch (error) {
     console.error('Search error:', error);

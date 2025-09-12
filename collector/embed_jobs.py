@@ -42,7 +42,7 @@ openai_client = OpenAI(api_key=openai_api_key)
 def get_jobs_without_embeddings(batch_size: int = 500) -> List[Dict]:
     """Query jobs with NULL embeddings in batches"""
     try:
-        response = supabase.table("jobs").select("*").is_null("embeddings").limit(batch_size).execute()
+        response = supabase.table("jobs").select("*").is_("core_requirements_embedding", "null").limit(batch_size).execute()
         return response.data or []
     except Exception as e:
         logger.error(f"Error querying jobs: {e}")
