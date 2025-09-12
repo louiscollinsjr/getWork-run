@@ -1,10 +1,24 @@
-require('dotenv').config();
+// Only load dotenv in development
+if (process.env.NODE_ENV !== 'production') {
+  require('dotenv').config();
+}
+
 const fastify = require('fastify')({ logger: true });
 const { createClient } = require('@supabase/supabase-js');
 const { OpenAI } = require('openai');
 
+// Debug environment variables
+console.log('Environment variables check:');
+console.log('NODE_ENV:', process.env.NODE_ENV || 'undefined');
+console.log('SUPABASE_URL:', process.env.SUPABASE_URL ? 'SET' : 'MISSING');
+console.log('SUPABASE_SERVICE_KEY:', process.env.SUPABASE_SERVICE_KEY ? 'SET' : 'MISSING');
+console.log('OPENAI_API_KEY:', process.env.OPENAI_API_KEY ? 'SET' : 'MISSING');
+
 // Validate environment variables
 if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_KEY) {
+  console.error('Missing environment variables:');
+  console.error('SUPABASE_URL:', process.env.SUPABASE_URL ? 'OK' : 'MISSING');
+  console.error('SUPABASE_SERVICE_KEY:', process.env.SUPABASE_SERVICE_KEY ? 'OK' : 'MISSING');
   throw new Error('Supabase credentials missing in environment variables');
 }
 
