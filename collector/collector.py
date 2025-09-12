@@ -202,7 +202,7 @@ def truncate_description(description: str) -> str:
     return description
 
 def job_to_dict(job) -> dict:
-    """Convert job object to optimized dictionary with text compression"""
+    """Convert job object to optimized dictionary with null safety"""
     def clean_value(v):
         if v is None:
             return None
@@ -227,19 +227,20 @@ def job_to_dict(job) -> dict:
         if config.compress_descriptions:
             description = compress_text(description)
     
+    # Map to database schema with null safety
     job_dict = {
         "title": clean_value(getattr(job, 'title', None)),
         "company": clean_value(getattr(job, 'company', None)),
         "location": clean_value(getattr(job, 'location', None)),
         "salary": clean_value(getattr(job, 'salary', None)),
         "description": description,
-        "job_url": clean_value(getattr(job, 'job_url', None)) or clean_value(getattr(job, 'url', None)),
+        "url": clean_value(getattr(job, 'job_url', None)) or clean_value(getattr(job, 'url', None)),
         "date_posted": date_posted_str,
         "job_type": clean_value(getattr(job, 'job_type', None)),
         "remote": bool(getattr(job, 'remote', False)) if getattr(job, 'remote', None) is not None else False,
         "is_remote": bool(getattr(job, 'is_remote', False)) if getattr(job, 'is_remote', None) is not None else False,
-        "site": clean_value(getattr(job, 'site', None)),
-        "country": "USA"  # Since we're focusing on USA jobs
+        "job_url": clean_value(getattr(job, 'job_url', None)) or clean_value(getattr(job, 'url', None)),
+        "country": "USA"  # Changed from US to USA for 3-char country code
     }
     return job_dict
 
@@ -341,11 +342,17 @@ class JobDeduplicator:
         }
     
     def generate_job_hash(self, job_dict: dict) -> str:
-        """Generate a unique hash for the job based on title, company, and location"""
+        """Generate a unique hash for the job based on title, company, and location with null safety"""
+        # Safely extract and clean values to prevent NoneType errors
+        title = job_dict.get('title', '') or ''
+        company = job_dict.get('company', '') or ''
+        location = job_dict.get('location', '') or ''
+        
+        # Convert to strings and apply lower/strip safely
         key_parts = [
-            job_dict.get('title', '').lower().strip(),
-            job_dict.get('company', '').lower().strip(),
-            job_dict.get('location', '').lower().strip()
+            str(title).lower().strip(),
+            str(company).lower().strip(), 
+            str(location).lower().strip()
         ]
         key = '|'.join(key_parts)
         return hashlib.md5(key.encode('utf-8')).hexdigest()
