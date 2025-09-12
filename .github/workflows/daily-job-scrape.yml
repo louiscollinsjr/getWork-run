@@ -35,3 +35,4 @@ jobs:
         with:
           name: scraper-logs
           path: ./collector/*.log
+          if-no-files-found: ignore
