@@ -1,0 +1,8 @@
+{
+    "projects": {
+      "frontend": {
+        "root": "frontend",
+        "framework": "sveltekit"
+      }
+    }
+  }
