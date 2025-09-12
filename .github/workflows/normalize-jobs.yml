@@ -1,0 +1,40 @@
+name: Normalize Jobs
+
+on:
+  schedule:
+    - cron: '15 */6 * * *' # Every 6 hours at :15 (4x daily)
+  workflow_dispatch:
+
+jobs:
+  normalize:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+          
+      - name: Install dependencies
+        working-directory: ./collector
+        run: pip install -r requirements.txt
+        
+      - name: Run normalization
+        working-directory: ./collector
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: python normalize_jobs.py
+        
+      - name: Notify on failure
+        if: failure()
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_TITLE: 'Job Normalization Failed'
+          SLACK_MESSAGE: 'Normalization job failed in run ${{ github.run_id }}'
+          SLACK_COLOR: 'danger'
