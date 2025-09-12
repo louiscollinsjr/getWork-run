@@ -71,3 +71,5 @@ ENV/
 # Collector specific
 collector/jobs.csv
 collector/scraper.log
+collector/setup-gh-secrets.sh
+collector/jobspy_readme.txt
