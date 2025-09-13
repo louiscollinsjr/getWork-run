@@ -68,7 +68,7 @@ def extract_comprehensive_job_data(job_data: Dict) -> Dict[str, Any]:
     - realistic_experience_level: What level of experience is realistic for this position ("Entry Level", "Mid Level", "Senior Level")
     - transferable_skills_indicators: List of indicators that suggest transferable skills
     - actual_job_complexity: Assessment of the job's technical complexity ("Beginner", "Intermediate", "Advanced")
-    - bias_removal_notes: Notes about any potential biases in the job description that might be removed or mitigated
+    - bias_removal_notes: List of specific bias reduction recommendations (e.g., ["Avoid strict degree requirements", "Include accommodation language", "Use inclusive evaluation criteria"])
     
     SALARY INFORMATION:
     - salary_min: Minimum salary as integer (null if not specified)
@@ -84,7 +84,7 @@ def extract_comprehensive_job_data(job_data: Dict) -> Dict[str, Any]:
       "realistic_experience_level": "string",
       "transferable_skills_indicators": ["indicator1", "indicator2", ...],
       "actual_job_complexity": "string",
-      "bias_removal_notes": "string",
+      "bias_removal_notes": ["recommendation1", "recommendation2", ...],
       "salary_min": integer or null,
       "salary_max": integer or null,
       "salary_currency": "string",
@@ -121,9 +121,30 @@ def extract_comprehensive_job_data(job_data: Dict) -> Dict[str, Any]:
         logger.error(f"Error extracting data for job {job_data.get('id', 'unknown')}: {e}")
         return None
 
-def update_job_comprehensive(job_id: int, extracted_data: Dict) -> bool:
+def generate_embedding_text(extracted_data: Dict, job_data: Dict) -> str:
+    """Generate comprehensive text for embeddings"""
+    title = job_data.get("title", "")
+    core_skills = extracted_data.get("core_skills", [])
+    transferable_skills = extracted_data.get("transferable_skills_indicators", [])
+    experience_level = extracted_data.get("realistic_experience_level", "")
+    complexity = extracted_data.get("actual_job_complexity", "")
+    
+    # Create rich text for better embeddings
+    embedding_text = f"""Title: {title}
+Skills: {', '.join(core_skills) if core_skills else 'Not specified'}
+Experience: {experience_level}
+Complexity: {complexity}
+Transferable: {', '.join(transferable_skills) if transferable_skills else 'Not specified'}"""
+    
+    return embedding_text
+
+def update_job_comprehensive(job_id: int, extracted_data: Dict, job_data: Dict) -> bool:
     """Update job with all extracted data"""
     try:
+        # Generate embedding text
+        embedding_text = generate_embedding_text(extracted_data, job_data)
+        
+        # Prepare the update data
         update_data = {
             "core_skills": extracted_data.get("core_skills"),
             "nice_to_have_skills": extracted_data.get("nice_to_have_skills"),
@@ -136,6 +157,7 @@ def update_job_comprehensive(job_id: int, extracted_data: Dict) -> bool:
             "salary_currency": extracted_data.get("salary_currency", "USD"),
             "salary_period": extracted_data.get("salary_period", "year"),
             "salary_type": extracted_data.get("salary_type", "not_specified"),
+            "embedding_text": embedding_text,
             "processed_at": datetime.now().isoformat()
         }
         
@@ -180,7 +202,7 @@ def main():
                 extracted_data = extract_comprehensive_job_data(job)
                 
                 if extracted_data:
-                    success = update_job_comprehensive(job_id, extracted_data)
+                    success = update_job_comprehensive(job_id, extracted_data, job)
                     if success:
                         success_count += 1
                     else:

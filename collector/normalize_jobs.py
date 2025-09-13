@@ -72,7 +72,7 @@ def extract_comprehensive_job_data(job_data: Dict) -> Dict[str, Any]:
     - realistic_experience_level: What level of experience is realistic for this position ("Entry Level", "Mid Level", "Senior Level")
     - transferable_skills_indicators: List of indicators that suggest transferable skills
     - actual_job_complexity: Assessment of the job's technical complexity ("Beginner", "Intermediate", "Advanced")
-    - bias_removal_notes: Notes about any potential biases in the job description that might be removed or mitigated
+    - bias_removal_notes: List of specific bias reduction recommendations (e.g., ["Avoid strict degree requirements", "Include accommodation language", "Use inclusive evaluation criteria"])
     
     SALARY INFORMATION:
     - salary_min: Minimum salary as integer (null if not specified)
@@ -88,7 +88,7 @@ def extract_comprehensive_job_data(job_data: Dict) -> Dict[str, Any]:
       "realistic_experience_level": "string",
       "transferable_skills_indicators": ["indicator1", "indicator2", ...],
       "actual_job_complexity": "string",
-      "bias_removal_notes": "string",
+      "bias_removal_notes": ["recommendation1", "recommendation2", ...],
       "salary_min": integer or null,
       "salary_max": integer or null,
       "salary_currency": "string",
@@ -111,7 +111,7 @@ def extract_comprehensive_job_data(job_data: Dict) -> Dict[str, Any]:
     try:
         # Make the OpenAI API call
         response = openai_client.chat.completions.create(
-            model="gpt-5-mini",
+            model="gpt-4o-mini",
             response_format={"type": "json_object"},
             messages=[
                 {"role": "system", "content": system_prompt},

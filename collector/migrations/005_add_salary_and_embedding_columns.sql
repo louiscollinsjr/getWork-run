@@ -2,15 +2,15 @@
 ALTER TABLE jobs 
 ADD COLUMN IF NOT EXISTS salary_min INTEGER,
 ADD COLUMN IF NOT EXISTS salary_max INTEGER,
-ADD COLUMN IF NOT EXISTS salary_currency VARCHAR(3) DEFAULT 'USD',
-ADD COLUMN IF NOT EXISTS salary_period VARCHAR(10) DEFAULT 'year', -- 'year', 'month', 'hour', 'week'
-ADD COLUMN IF NOT EXISTS salary_type VARCHAR(20); -- 'range', 'starting', 'negotiable', 'not_specified'
+ADD COLUMN IF NOT EXISTS salary_currency VARCHAR(5) DEFAULT 'USD',
+ADD COLUMN IF NOT EXISTS salary_period VARCHAR(20) DEFAULT 'year', -- 'year', 'month', 'hour', 'week', 'per year', etc.
+ADD COLUMN IF NOT EXISTS salary_type VARCHAR(25); -- 'range', 'starting', 'negotiable', 'not_specified'
 
 -- Add embedding text column for comprehensive job matching
 ALTER TABLE jobs 
 ADD COLUMN IF NOT EXISTS embedding_text TEXT;
 
--- Create indexes for salary queries
-CREATE INDEX IF NOT EXISTS idx_jobs_salary_min ON jobs(salary_min);
-CREATE INDEX IF NOT EXISTS idx_jobs_salary_max ON jobs(salary_max);
-CREATE INDEX IF NOT EXISTS idx_jobs_salary_type ON jobs(salary_type);
+-- Fix VARCHAR length issues for salary fields
+ALTER TABLE jobs ALTER COLUMN salary_period TYPE VARCHAR(20);
+ALTER TABLE jobs ALTER COLUMN salary_type TYPE VARCHAR(25);
+ALTER TABLE jobs ALTER COLUMN salary_currency TYPE VARCHAR(5);
