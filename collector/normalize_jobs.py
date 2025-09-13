@@ -111,7 +111,7 @@ def extract_comprehensive_job_data(job_data: Dict) -> Dict[str, Any]:
     try:
         # Make the OpenAI API call
         response = openai_client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="gpt-5-mini",
             response_format={"type": "json_object"},
             messages=[
                 {"role": "system", "content": system_prompt},
