@@ -7,6 +7,13 @@ const fastify = require('fastify')({ logger: true });
 const { createClient } = require('@supabase/supabase-js');
 const { OpenAI } = require('openai');
 
+// Register CORS plugin for React Native development
+fastify.register(require('@fastify/cors'), {
+  origin: true, // Allow all origins during development
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+});
+
 // Debug environment variables
 console.log('Environment variables check:');
 console.log('NODE_ENV:', process.env.NODE_ENV || 'undefined');
@@ -68,6 +75,19 @@ async function vectorSearch(embedding, filters = {}) {
     throw error;
   }
 }
+
+// GET /api/health - Health check endpoint
+fastify.get('/api/health', async (request, reply) => {
+  return {
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    message: 'GetWork API is running!',
+    endpoints: {
+      search: 'POST /api/search - Natural language job search',
+      jobs: 'GET /api/jobs - Get latest jobs'
+    }
+  };
+});
 
 // POST /api/search endpoint
 fastify.post('/api/search', async (request, reply) => {

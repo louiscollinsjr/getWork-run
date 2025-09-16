@@ -1,0 +1,215 @@
+name: Distributed Job Collection
+
+on:
+  schedule:
+    # Run multiple times per day to distribute load
+    - cron: '0 6 * * *'   # 6 AM UTC - Morning batch
+    - cron: '0 12 * * *'  # 12 PM UTC - Midday batch  
+    - cron: '0 18 * * *'  # 6 PM UTC - Evening batch
+    - cron: '0 0 * * *'   # Midnight UTC - Night batch
+  workflow_dispatch:
+    inputs:
+      strategy:
+        description: 'Collection strategy'
+        required: false
+        default: 'comprehensive'
+        type: choice
+        options:
+        - high_volume
+        - quality_focused
+        - comprehensive
+        - tech_focused
+      sites:
+        description: 'Specific sites to scrape (comma-separated)'
+        required: false
+        default: ''
+      max_jobs:
+        description: 'Maximum jobs to collect'
+        required: false
+        default: '500'
+
+jobs:
+  # Job 1: Indeed + ZipRecruiter (High Volume)
+  collect-volume:
+    runs-on: ubuntu-latest
+    if: github.event.schedule == '0 6 * * *' || github.event_name == 'workflow_dispatch'
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+          
+      - name: Install dependencies
+        working-directory: ./collector
+        run: |
+          pip install -r requirements.txt
+          pip install --upgrade python-jobspy
+        
+      - name: Collect Jobs - Volume Sites
+        working-directory: ./collector
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          SITES_PRIORITY: "indeed,zip_recruiter"
+          COLLECTION_STRATEGY: "high_volume"
+          MAX_JOBS_PER_RUN: "300"
+          BATCH_IDENTIFIER: "volume"
+        run: python collector_distributed.py
+
+  # Job 2: LinkedIn + Glassdoor (Quality Focus)  
+  collect-quality:
+    runs-on: ubuntu-latest
+    if: github.event.schedule == '0 12 * * *' || github.event_name == 'workflow_dispatch'
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+          
+      - name: Install dependencies
+        working-directory: ./collector
+        run: |
+          pip install -r requirements.txt
+          pip install --upgrade python-jobspy
+        
+      - name: Collect Jobs - Quality Sites
+        working-directory: ./collector
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          PROXY_LIST: ${{ secrets.PROXY_LIST }}
+          SITES_PRIORITY: "linkedin,glassdoor"
+          COLLECTION_STRATEGY: "quality_focused"
+          MAX_JOBS_PER_RUN: "200"
+          BATCH_IDENTIFIER: "quality"
+        run: python collector_distributed.py
+
+  # Job 3: Google + Specialty Sites (Evening)
+  collect-specialty:
+    runs-on: ubuntu-latest
+    if: github.event.schedule == '0 18 * * *' || github.event_name == 'workflow_dispatch'
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+          
+      - name: Install dependencies
+        working-directory: ./collector
+        run: |
+          pip install -r requirements.txt
+          pip install --upgrade python-jobspy
+        
+      - name: Collect Jobs - Google & Specialty
+        working-directory: ./collector
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          SITES_PRIORITY: "google,glassdoor"
+          COLLECTION_STRATEGY: "comprehensive"
+          MAX_JOBS_PER_RUN: "150"
+          BATCH_IDENTIFIER: "specialty"
+        run: python collector_distributed.py
+
+  # Job 4: Tech-Focused Collection (Night)
+  collect-tech:
+    runs-on: ubuntu-latest
+    if: github.event.schedule == '0 0 * * *' || github.event_name == 'workflow_dispatch'
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+          
+      - name: Install dependencies
+        working-directory: ./collector
+        run: |
+          pip install -r requirements.txt
+          pip install --upgrade python-jobspy
+        
+      - name: Collect Jobs - Tech Focus
+        working-directory: ./collector
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          PROXY_LIST: ${{ secrets.PROXY_LIST }}
+          SITES_PRIORITY: "linkedin,indeed,glassdoor"
+          COLLECTION_STRATEGY: "tech_focused"
+          MAX_JOBS_PER_RUN: "250"
+          BATCH_IDENTIFIER: "tech"
+          SEARCH_FOCUS: "software_engineering,data_and_ai"
+        run: python collector_distributed.py
+
+  # Cleanup and Maintenance
+  maintenance:
+    runs-on: ubuntu-latest
+    needs: [collect-volume, collect-quality, collect-specialty, collect-tech]
+    if: always()
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+          
+      - name: Install dependencies
+        working-directory: ./collector
+        run: pip install -r requirements.txt
+        
+      - name: Run Maintenance Tasks
+        working-directory: ./collector
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: |
+          # Clean up duplicates
+          python -c "
+          from supabase import create_client
+          import os
+          
+          client = create_client(os.getenv('SUPABASE_URL'), os.getenv('SUPABASE_SERVICE_KEY'))
+          
+          # Remove duplicates based on job_url_hash
+          result = client.rpc('remove_duplicate_jobs').execute()
+          print(f'Removed {result.data} duplicate jobs')
+          
+          # Update job statistics
+          stats = client.rpc('update_collection_stats').execute()
+          print(f'Updated collection statistics: {stats.data}')
+          "
+
+  # Report Status
+  report:
+    runs-on: ubuntu-latest
+    needs: [maintenance]
+    if: always()
+    
+    steps:
+      - name: Generate Collection Report
+        run: |
+          echo "## Job Collection Report - $(date)" >> $GITHUB_STEP_SUMMARY
+          echo "### Workflow Status:" >> $GITHUB_STEP_SUMMARY
+          echo "- Volume Collection: ${{ needs.collect-volume.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Quality Collection: ${{ needs.collect-quality.result }}" >> $GITHUB_STEP_SUMMARY  
+          echo "- Specialty Collection: ${{ needs.collect-specialty.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Tech Collection: ${{ needs.collect-tech.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Maintenance: ${{ needs.maintenance.result }}" >> $GITHUB_STEP_SUMMARY

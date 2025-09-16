@@ -1,0 +1,19 @@
+# Proxy configuration for LinkedIn and rate-limited sites
+# Format: username:password@host:port or host:port
+# One proxy per line
+
+# Example proxies (replace with your actual proxies)
+# user1:pass1@proxy1.example.com:8080
+# user2:pass2@proxy2.example.com:8080
+# 192.168.1.100:3128
+# 10.0.0.50:8080
+
+# Free proxy services (use with caution in production):
+# Note: Free proxies are often unreliable and may not work consistently
+# Consider using paid proxy services for production use
+
+# Instructions:
+# 1. Copy this file to proxies.txt
+# 2. Add your actual proxy servers
+# 3. Test each proxy before adding to production
+# 4. For LinkedIn scraping, rotating proxies are highly recommended
