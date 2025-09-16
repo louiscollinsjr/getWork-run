@@ -51,7 +51,7 @@ class MonitoringSystem:
             since_time = datetime.now() - timedelta(hours=time_window_hours)
             
             # Get basic job statistics
-            jobs_query = self.supabase.table('jobs').select('*').gte('collected_at', since_time.isoformat())
+            jobs_query = self.supabase.table('jobs').select('*').gte('scraped_at', since_time.isoformat())
             jobs_result = jobs_query.execute()
             jobs = jobs_result.data
             
@@ -151,8 +151,8 @@ class MonitoringSystem:
             ))
         
         # Check if collection has stopped
-        recent_jobs = self.supabase.table('jobs').select('collected_at').gte(
-            'collected_at', 
+        recent_jobs = self.supabase.table('jobs').select('scraped_at').gte(
+            'scraped_at', 
             (datetime.now() - timedelta(hours=thresholds['max_hours_without_collection'])).isoformat()
         ).execute()
         
@@ -177,7 +177,7 @@ class MonitoringSystem:
         try:
             # This would ideally connect to your logging system
             # For now, we'll estimate based on jobs with missing data
-            total_attempts_query = self.supabase.table('jobs').select('id', 'company').gte('collected_at', since_time.isoformat())
+            total_attempts_query = self.supabase.table('jobs').select('id', 'company').gte('scraped_at', since_time.isoformat())
             total_attempts = total_attempts_query.execute()
             
             if not total_attempts.data:
@@ -193,14 +193,14 @@ class MonitoringSystem:
     def _calculate_duplicate_rate(self, since_time: datetime) -> float:
         """Calculate duplicate job rate"""
         try:
-            jobs_query = self.supabase.table('jobs').select('job_url_hash').gte('collected_at', since_time.isoformat())
+            jobs_query = self.supabase.table('jobs').select('job_hash').gte('scraped_at', since_time.isoformat())
             jobs_result = jobs_query.execute()
             
             if not jobs_result.data:
                 return 0.0
             
             total_jobs = len(jobs_result.data)
-            unique_hashes = len(set(job['job_url_hash'] for job in jobs_result.data if job.get('job_url_hash')))
+            unique_hashes = len(set(job['job_hash'] for job in jobs_result.data if job.get('job_hash')))
             
             if total_jobs == 0:
                 return 0.0
