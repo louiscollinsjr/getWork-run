@@ -2,7 +2,17 @@
 -- Run these updates on your Supabase database
 
 -- 1. Update jobs table to handle null companies gracefully
-ALTER TABLE jobs ALTER COLUMN company DROP NOT NULL;
+-- Note: Only drop NOT NULL if it exists, otherwise skip
+DO $$ 
+BEGIN
+    BEGIN
+        ALTER TABLE jobs ALTER COLUMN company DROP NOT NULL;
+    EXCEPTION
+        WHEN others THEN
+            RAISE NOTICE 'company column NOT NULL constraint may not exist, continuing...';
+    END;
+END $$;
+
 ALTER TABLE jobs ALTER COLUMN company SET DEFAULT 'Unknown Company';
 
 -- 2. Add collection metadata columns
@@ -40,8 +50,8 @@ CREATE TABLE IF NOT EXISTS collection_stats (
 CREATE INDEX IF NOT EXISTS idx_jobs_batch_id ON jobs(batch_id);
 CREATE INDEX IF NOT EXISTS idx_jobs_source_site ON jobs(source_site);
 CREATE INDEX IF NOT EXISTS idx_jobs_search_term ON jobs(search_term_used);
-CREATE INDEX IF NOT EXISTS idx_jobs_collection_date ON jobs(collected_at);
-CREATE INDEX IF NOT EXISTS idx_jobs_company_location ON jobs(company, city, state);
+CREATE INDEX IF NOT EXISTS idx_jobs_collection_date ON jobs(scraped_at);
+CREATE INDEX IF NOT EXISTS idx_jobs_company_location ON jobs(company, location);
 
 -- 6. Create function to remove duplicate jobs
 CREATE OR REPLACE FUNCTION remove_duplicate_jobs()
@@ -49,15 +59,15 @@ RETURNS INTEGER AS $$
 DECLARE
     duplicates_removed INTEGER;
 BEGIN
-    -- Remove duplicates based on job_url_hash, keeping the most recent
+    -- Remove duplicates based on job_hash, keeping the most recent
     WITH duplicates AS (
         SELECT id,
                ROW_NUMBER() OVER (
-                   PARTITION BY job_url_hash 
-                   ORDER BY collected_at DESC, created_at DESC
+                   PARTITION BY job_hash 
+                   ORDER BY scraped_at DESC, id DESC
                ) as rn
         FROM jobs
-        WHERE job_url_hash IS NOT NULL
+        WHERE job_hash IS NOT NULL
     )
     DELETE FROM jobs 
     WHERE id IN (
@@ -89,13 +99,13 @@ BEGIN
         LEFT JOIN (
             SELECT source_site, COUNT(*) as site_count
             FROM jobs 
-            WHERE DATE(collected_at) = today_date
+            WHERE DATE(scraped_at) = today_date
             GROUP BY source_site
         ) site_counts ON j.source_site = site_counts.source_site
         LEFT JOIN (
             SELECT search_term_used, COUNT(*) as term_count
             FROM jobs 
-            WHERE DATE(collected_at) = today_date 
+            WHERE DATE(scraped_at) = today_date 
             AND search_term_used IS NOT NULL
             GROUP BY search_term_used
             ORDER BY term_count DESC
@@ -104,7 +114,7 @@ BEGIN
         CROSS JOIN LATERAL (
             SELECT json_build_object('term', term_stats.search_term_used, 'count', term_stats.term_count) as search_term_data
         ) term_data
-        WHERE DATE(j.collected_at) = today_date
+        WHERE DATE(j.scraped_at) = today_date
     )
     INSERT INTO collection_stats (
         date, total_jobs_collected, jobs_by_site, success_rate, top_search_terms
@@ -135,31 +145,31 @@ $$ LANGUAGE plpgsql;
 -- 8. Create view for job collection dashboard
 CREATE OR REPLACE VIEW job_collection_dashboard AS
 SELECT 
-    DATE(collected_at) as collection_date,
+    DATE(j.scraped_at) as collection_date,
     COUNT(*) as total_jobs,
-    COUNT(DISTINCT company) as unique_companies,
-    COUNT(DISTINCT CONCAT(city, ', ', state)) as unique_locations,
-    COUNT(CASE WHEN company = 'Unknown Company' THEN 1 END) as jobs_missing_company,
+    COUNT(DISTINCT j.company) as unique_companies,
+    COUNT(DISTINCT j.location) as unique_locations,
+    COUNT(CASE WHEN j.company = 'Unknown Company' THEN 1 END) as jobs_missing_company,
     ROUND(
-        (COUNT(*) - COUNT(CASE WHEN company = 'Unknown Company' THEN 1 END)) * 100.0 / COUNT(*), 
+        (COUNT(*) - COUNT(CASE WHEN j.company = 'Unknown Company' THEN 1 END)) * 100.0 / COUNT(*), 
         2
     ) as data_quality_score,
     json_object_agg(
-        COALESCE(source_site, 'unknown'), 
-        site_job_count
+        COALESCE(j.source_site, 'unknown'), 
+        COALESCE(site_stats.site_job_count, 0)
     ) as jobs_by_site
 FROM jobs j
 LEFT JOIN (
     SELECT 
         source_site,
-        DATE(collected_at) as date,
+        DATE(scraped_at) as date,
         COUNT(*) as site_job_count
     FROM jobs
-    GROUP BY source_site, DATE(collected_at)
+    GROUP BY source_site, DATE(scraped_at)
 ) site_stats ON j.source_site = site_stats.source_site 
-    AND DATE(j.collected_at) = site_stats.date
-WHERE collected_at >= CURRENT_DATE - INTERVAL '30 days'
-GROUP BY DATE(collected_at)
+    AND DATE(j.scraped_at) = site_stats.date
+WHERE j.scraped_at >= CURRENT_DATE - INTERVAL '30 days'
+GROUP BY DATE(j.scraped_at)
 ORDER BY collection_date DESC;
 
 -- 9. Create alerts for monitoring
@@ -179,7 +189,7 @@ CREATE OR REPLACE FUNCTION check_collection_health()
 RETURNS TABLE(alert_type TEXT, message TEXT, severity TEXT) AS $$
 BEGIN
     -- Check if daily collection is below threshold
-    IF (SELECT COUNT(*) FROM jobs WHERE DATE(collected_at) = CURRENT_DATE) < 100 THEN
+    IF (SELECT COUNT(*) FROM jobs WHERE DATE(scraped_at) = CURRENT_DATE) < 100 THEN
         RETURN QUERY SELECT 
             'low_collection'::TEXT, 
             'Daily job collection is below expected threshold'::TEXT,
@@ -190,7 +200,7 @@ BEGIN
     IF (SELECT 
             COUNT(CASE WHEN company = 'Unknown Company' THEN 1 END) * 100.0 / COUNT(*)
         FROM jobs 
-        WHERE DATE(collected_at) = CURRENT_DATE
+        WHERE DATE(scraped_at) = CURRENT_DATE
        ) > 30 THEN
         RETURN QUERY SELECT 
             'high_missing_data'::TEXT,
@@ -201,7 +211,7 @@ BEGIN
     -- Check if no jobs collected in last 6 hours
     IF NOT EXISTS (
         SELECT 1 FROM jobs 
-        WHERE collected_at > NOW() - INTERVAL '6 hours'
+        WHERE scraped_at > NOW() - INTERVAL '6 hours'
     ) THEN
         RETURN QUERY SELECT 
             'collection_stopped'::TEXT,

@@ -171,11 +171,11 @@ class DistributedJobCollector:
                 job['batch_id'] = self.batch_id
                 job['search_term_used'] = search_term
                 job['location_searched'] = location
-                job['collected_at'] = datetime.now().isoformat()
+                job['scraped_at'] = datetime.now().isoformat()
                 
                 # Generate hash for deduplication
                 job_hash = self._generate_job_hash(job)
-                job['job_url_hash'] = job_hash
+                job['job_hash'] = job_hash
                 
                 batch_data.append(job)
                 
@@ -189,7 +189,7 @@ class DistributedJobCollector:
                 # Use upsert to handle duplicates gracefully
                 result = self.supabase.table('jobs').upsert(
                     batch_data,
-                    on_conflict='job_url_hash'
+                    on_conflict='job_hash'
                 ).execute()
                 
                 stored_count = len(batch_data)
@@ -208,7 +208,7 @@ class DistributedJobCollector:
         
         for job in jobs:
             try:
-                self.supabase.table('jobs').upsert(job, on_conflict='job_url_hash').execute()
+                self.supabase.table('jobs').upsert(job, on_conflict='job_hash').execute()
                 stored_count += 1
             except Exception as e:
                 logger.error(f"Error storing individual job: {str(e)}")
